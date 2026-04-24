@@ -429,10 +429,12 @@ FROM dblink(
 );
 
 \echo '[phase] archive all source rows into legacy_stealthnet.raw_rows'
+SELECT set_config('migration_stealthnet.source_db', :'source_db', false);
 DO $$
 DECLARE
     rec record;
-    conn text := 'dbname=' || :'source_db';
+    src_db text := current_setting('migration_stealthnet.source_db', true);
+    conn text := 'dbname=' || src_db;
     source_sql text;
     inserted_rows bigint;
 BEGIN
@@ -454,7 +456,7 @@ BEGIN
             'INSERT INTO legacy_stealthnet.raw_rows(source_db, source_table, source_pk, row_data)
              SELECT %L, %L, d.source_pk, d.row_data
              FROM dblink(%L, %L) AS d(source_pk text, row_data jsonb)',
-            :'source_db',
+            src_db,
             rec.table_name,
             conn,
             source_sql
