@@ -467,6 +467,21 @@ BEGIN
     END LOOP;
 END $$;
 
+\echo '[phase] ensure users defaults compatibility'
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'has_had_paid_subscription'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN has_had_paid_subscription SET DEFAULT false';
+        EXECUTE 'UPDATE users SET has_had_paid_subscription = false WHERE has_had_paid_subscription IS NULL';
+    END IF;
+END $$;
+
 \echo '[phase] migrate clients -> users'
 DO $$
 DECLARE
