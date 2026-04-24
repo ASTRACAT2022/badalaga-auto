@@ -132,6 +132,7 @@ sed -E \
   -e '/^[[:space:]]*\\connect\b/d' \
   -e '/^[[:space:]]*CREATE DATABASE\b/Id' \
   -e '/^[[:space:]]*ALTER DATABASE\b/Id' \
+  -e '/^[[:space:]]*SET[[:space:]]+transaction_timeout[[:space:]]*=.*/Id' \
   -e '/^[[:space:]]*SET[[:space:]]+SESSION[[:space:]]+AUTHORIZATION\b/Id' \
   -e '/^[[:space:]]*ALTER[[:space:]].*OWNER TO\b/Id' \
   -e '/^[[:space:]]*(GRANT|REVOKE)\b/Id' \
