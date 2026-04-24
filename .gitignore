@@ -55,6 +55,8 @@
 !backups/
 !backups/README.md
 !backups/.gitkeep
+!gateway/
+!gateway/**
 
 # ========== BLACKLIST: игнорируемые внутри папок ==========
 
