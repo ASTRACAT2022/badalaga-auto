@@ -1212,6 +1212,7 @@ BEGIN
             title,
             status,
             priority,
+            user_reply_block_permanent,
             created_at,
             updated_at
         )
@@ -1220,6 +1221,7 @@ BEGIN
             left(COALESCE(NULLIF(rec.subject, ''), 'Imported ticket'), 255),
             status_value,
             'normal',
+            false,
             COALESCE(rec.created_at, now()::timestamp) AT TIME ZONE 'UTC',
             COALESCE(rec.updated_at, rec.created_at, now()::timestamp) AT TIME ZONE 'UTC'
         )
