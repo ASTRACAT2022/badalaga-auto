@@ -995,6 +995,7 @@ BEGIN
                 updated_at,
                 remnawave_short_uuid,
                 remnawave_uuid,
+                remnawave_short_id,
                 tariff_id
             )
             VALUES (
@@ -1014,6 +1015,7 @@ BEGIN
                 COALESCE(rec.updated_at, rec.created_at, now()::timestamp) AT TIME ZONE 'UTC',
                 CASE WHEN NULLIF(rec.remnawave_uuid, '') IS NOT NULL THEN left(replace(rec.remnawave_uuid, '-', ''), 8) ELSE NULL END,
                 NULLIF(rec.remnawave_uuid, ''),
+                left(md5('stealthnet-sub:' || COALESCE(rec.id, '')), 16),
                 target_tariff_id
             )
             RETURNING id INTO target_subscription_id;
@@ -1036,6 +1038,7 @@ BEGIN
                     updated_at,
                     remnawave_short_uuid,
                     remnawave_uuid,
+                    remnawave_short_id,
                     tariff_id
                 )
                 VALUES (
@@ -1055,6 +1058,7 @@ BEGIN
                     COALESCE(rec.updated_at, rec.created_at, now()::timestamp) AT TIME ZONE 'UTC',
                     CASE WHEN NULLIF(rec.remnawave_uuid, '') IS NOT NULL THEN left(replace(rec.remnawave_uuid, '-', ''), 8) ELSE NULL END,
                     NULLIF(rec.remnawave_uuid, ''),
+                    left(md5('stealthnet-sub:' || COALESCE(rec.id, '')), 16),
                     target_tariff_id
                 )
                 RETURNING id INTO target_subscription_id;
