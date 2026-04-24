@@ -480,6 +480,70 @@ BEGIN
         EXECUTE 'ALTER TABLE users ALTER COLUMN has_had_paid_subscription SET DEFAULT false';
         EXECUTE 'UPDATE users SET has_had_paid_subscription = false WHERE has_had_paid_subscription IS NULL';
     END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'email_verified'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN email_verified SET DEFAULT false';
+        EXECUTE 'UPDATE users SET email_verified = false WHERE email_verified IS NULL';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'auto_promo_group_assigned'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN auto_promo_group_assigned SET DEFAULT false';
+        EXECUTE 'UPDATE users SET auto_promo_group_assigned = false WHERE auto_promo_group_assigned IS NULL';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'auto_promo_group_threshold_kopeks'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN auto_promo_group_threshold_kopeks SET DEFAULT 0';
+        EXECUTE 'UPDATE users SET auto_promo_group_threshold_kopeks = 0 WHERE auto_promo_group_threshold_kopeks IS NULL';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'promo_offer_discount_percent'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN promo_offer_discount_percent SET DEFAULT 0';
+        EXECUTE 'UPDATE users SET promo_offer_discount_percent = 0 WHERE promo_offer_discount_percent IS NULL';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'restriction_topup'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN restriction_topup SET DEFAULT false';
+        EXECUTE 'UPDATE users SET restriction_topup = false WHERE restriction_topup IS NULL';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'restriction_subscription'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN restriction_subscription SET DEFAULT false';
+        EXECUTE 'UPDATE users SET restriction_subscription = false WHERE restriction_subscription IS NULL';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'partner_status'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN partner_status SET DEFAULT ''none''';
+        EXECUTE 'UPDATE users SET partner_status = ''none'' WHERE partner_status IS NULL';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'has_made_first_topup'
+    ) THEN
+        EXECUTE 'ALTER TABLE users ALTER COLUMN has_made_first_topup SET DEFAULT false';
+        EXECUTE 'UPDATE users SET has_made_first_topup = false WHERE has_made_first_topup IS NULL';
+    END IF;
 END $$;
 
 \echo '[phase] migrate clients -> users'
@@ -535,13 +599,24 @@ BEGIN
                 status,
                 language,
                 balance_kopeks,
+                used_promocodes,
+                has_had_paid_subscription,
                 referral_code,
                 created_at,
                 updated_at,
+                last_activity,
                 remnawave_uuid,
                 email,
+                email_verified,
                 password_hash,
-                google_id
+                google_id,
+                auto_promo_group_assigned,
+                auto_promo_group_threshold_kopeks,
+                promo_offer_discount_percent,
+                restriction_topup,
+                restriction_subscription,
+                partner_status,
+                has_made_first_topup
             )
             VALUES (
                 tg_id,
@@ -550,13 +625,24 @@ BEGIN
                 CASE WHEN COALESCE(rec.is_blocked, false) THEN 'blocked' ELSE 'active' END,
                 language_code,
                 GREATEST(0, round(COALESCE(rec.balance, 0) * 100.0)::integer),
+                0,
+                false,
                 NULLIF(rec.referral_code, ''),
                 COALESCE(rec.created_at, now()::timestamp) AT TIME ZONE 'UTC',
                 COALESCE(rec.updated_at, rec.created_at, now()::timestamp) AT TIME ZONE 'UTC',
+                COALESCE(rec.updated_at, rec.created_at, now()::timestamp) AT TIME ZONE 'UTC',
                 NULLIF(rec.remnawave_uuid, ''),
                 NULLIF(lower(rec.email), ''),
+                false,
                 NULLIF(rec.password_hash, ''),
-                NULLIF(rec.google_id, '')
+                NULLIF(rec.google_id, ''),
+                false,
+                0,
+                0,
+                false,
+                false,
+                'none',
+                false
             )
             RETURNING id INTO target_user_id;
             inserted_count := inserted_count + 1;
