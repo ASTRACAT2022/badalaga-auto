@@ -881,6 +881,7 @@ BEGIN
 END $$;
 
 \echo '[phase] migrate secondary_subscriptions -> subscriptions'
+SELECT set_config('migration_stealthnet.subs_mode', :'subs_mode', false);
 DO $$
 DECLARE
     rec record;
@@ -891,7 +892,7 @@ DECLARE
     start_ts timestamptz;
     end_ts timestamptz;
     status_value text;
-    subs_mode text := COALESCE(NULLIF(:'subs_mode', ''), 'expired');
+    subs_mode text := COALESCE(NULLIF(current_setting('migration_stealthnet.subs_mode', true), ''), 'expired');
     tariff_traffic_limit integer;
     tariff_device_limit integer;
     tariff_squads jsonb;
