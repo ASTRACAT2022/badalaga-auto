@@ -203,18 +203,42 @@ BEGIN
   END IF;
 
   IF source_table IS NULL THEN
-    CREATE TABLE public.secondary_subscriptions (
-      id text,
-      owner_id text,
-      remnawave_uuid text,
-      subscription_index integer,
-      tariff_id text,
-      gift_status text,
-      gifted_to_client_id text,
-      created_at timestamp,
-      updated_at timestamp
-    );
-    RAISE NOTICE '[compat] created empty public.secondary_subscriptions';
+    IF to_regclass('public.clients') IS NOT NULL THEN
+      CREATE TABLE public.secondary_subscriptions AS
+      SELECT
+        ('client-' || c.id::text) AS id,
+        c.id::text AS owner_id,
+        NULLIF(btrim(COALESCE(c.remnawave_uuid::text, '')), '') AS remnawave_uuid,
+        1::integer AS subscription_index,
+        (
+          SELECT t.id::text
+          FROM public.tariffs t
+          ORDER BY COALESCE(t.created_at, now()::timestamp), t.id
+          LIMIT 1
+        ) AS tariff_id,
+        NULL::text AS gift_status,
+        NULL::text AS gifted_to_client_id,
+        COALESCE(c.created_at, now()::timestamp) AS created_at,
+        COALESCE(c.updated_at, c.created_at, now()::timestamp) AS updated_at
+      FROM public.clients c
+      WHERE NULLIF(btrim(COALESCE(c.remnawave_uuid::text, '')), '') IS NOT NULL;
+
+      RAISE NOTICE '[compat] created public.secondary_subscriptions from clients (rows=%)',
+        (SELECT count(*) FROM public.secondary_subscriptions);
+    ELSE
+      CREATE TABLE public.secondary_subscriptions (
+        id text,
+        owner_id text,
+        remnawave_uuid text,
+        subscription_index integer,
+        tariff_id text,
+        gift_status text,
+        gifted_to_client_id text,
+        created_at timestamp,
+        updated_at timestamp
+      );
+      RAISE NOTICE '[compat] created empty public.secondary_subscriptions';
+    END IF;
     RETURN;
   END IF;
 
