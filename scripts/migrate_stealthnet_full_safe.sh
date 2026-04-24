@@ -126,6 +126,19 @@ log "source dump: $DUMP_FILE"
 log "subscriptions mode: $SUBS_MODE"
 log "sanitizing dump -> $SANITIZED_DUMP"
 
+# Official SQL migration uses dblink('dbname=<staging>') without explicit user.
+# In some environments dblink tries role "postgres". Ensure that role exists and is usable.
+POSTGRES_ROLE_STATE="$(docker exec -i "$PG_CONTAINER" psql -At -U "$PG_USER" -d postgres -c "SELECT (rolcanlogin::int::text || ':' || rolsuper::int::text) FROM pg_roles WHERE rolname='postgres' LIMIT 1;" 2>/dev/null || true)"
+if [[ -z "$POSTGRES_ROLE_STATE" ]]; then
+  log "role 'postgres' is missing; creating it for dblink compatibility"
+  docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d postgres -c "CREATE ROLE postgres WITH LOGIN SUPERUSER;" >/dev/null \
+    || fail "failed to create role 'postgres'. create it manually and rerun."
+elif [[ "$POSTGRES_ROLE_STATE" != "1:1" ]]; then
+  log "role 'postgres' exists but is not LOGIN+SUPERUSER; updating for dblink compatibility"
+  docker exec -i "$PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$PG_USER" -d postgres -c "ALTER ROLE postgres WITH LOGIN SUPERUSER;" >/dev/null \
+    || fail "failed to alter role 'postgres' to LOGIN SUPERUSER. fix role and rerun."
+fi
+
 # Remove dump directives that break restore into non-superuser staging DBs or old psql clients.
 sed -E \
   -e '/^[[:space:]]*\\(restrict|unrestrict)\b/d' \
