@@ -996,7 +996,8 @@ BEGIN
                 remnawave_short_uuid,
                 remnawave_uuid,
                 remnawave_short_id,
-                tariff_id
+                tariff_id,
+                is_daily_paused
             )
             VALUES (
                 target_user_id,
@@ -1016,7 +1017,8 @@ BEGIN
                 CASE WHEN NULLIF(rec.remnawave_uuid, '') IS NOT NULL THEN left(replace(rec.remnawave_uuid, '-', ''), 8) ELSE NULL END,
                 NULLIF(rec.remnawave_uuid, ''),
                 left(md5('stealthnet-sub:' || COALESCE(rec.id, '')), 16),
-                target_tariff_id
+                target_tariff_id,
+                false
             )
             RETURNING id INTO target_subscription_id;
         EXCEPTION
@@ -1039,7 +1041,8 @@ BEGIN
                     remnawave_short_uuid,
                     remnawave_uuid,
                     remnawave_short_id,
-                    tariff_id
+                    tariff_id,
+                    is_daily_paused
                 )
                 VALUES (
                     target_user_id,
@@ -1059,7 +1062,8 @@ BEGIN
                     CASE WHEN NULLIF(rec.remnawave_uuid, '') IS NOT NULL THEN left(replace(rec.remnawave_uuid, '-', ''), 8) ELSE NULL END,
                     NULLIF(rec.remnawave_uuid, ''),
                     left(md5('stealthnet-sub:' || COALESCE(rec.id, '')), 16),
-                    target_tariff_id
+                    target_tariff_id,
+                    false
                 )
                 RETURNING id INTO target_subscription_id;
         END;
