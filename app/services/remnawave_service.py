@@ -1932,6 +1932,41 @@ class RemnaWaveService:
                     continue
 
                 try:
+                    panel_status = panel_user.get('status', 'ACTIVE')
+                    expire_at_str = panel_user.get('expireAt', '')
+
+                    if expire_at_str:
+                        expire_at = self._parse_remnawave_date(expire_at_str)
+                        if panel_status == 'ACTIVE':
+                            local_end_date_utc = self._local_to_utc(subscription.end_date)
+                            time_diff = abs((local_end_date_utc - expire_at).total_seconds())
+                            if time_diff > 60:
+                                subscription.end_date = expire_at.replace(tzinfo=self._utc_timezone).astimezone(
+                                    self._panel_timezone
+                                )
+                                logger.info(
+                                    '✅ [multi-tariff] Обновлена end_date из панели',
+                                    subscription_id=subscription.id,
+                                    panel_uuid=panel_uuid,
+                                    time_diff=round(time_diff, 0),
+                                )
+
+                    current_time = self._now_utc()
+                    end_date_utc = self._local_to_utc(subscription.end_date)
+                    if panel_status == 'ACTIVE' and end_date_utc > current_time:
+                        new_status = SubscriptionStatus.ACTIVE.value
+                    elif panel_status == 'LIMITED':
+                        new_status = SubscriptionStatus.LIMITED.value
+                    elif panel_status == 'DISABLED':
+                        new_status = SubscriptionStatus.DISABLED.value
+                    elif end_date_utc <= current_time:
+                        new_status = SubscriptionStatus.EXPIRED.value
+                    else:
+                        new_status = subscription.status
+
+                    if subscription.status != new_status:
+                        subscription.status = new_status
+
                     # Update traffic
                     used_traffic_bytes = panel_user.get('usedTrafficBytes', 0) or 0
                     traffic_used_gb = used_traffic_bytes / (1024**3)
@@ -1939,6 +1974,26 @@ class RemnaWaveService:
                         subscription.traffic_used_gb = traffic_used_gb
 
                     # traffic_limit_gb: bot is source of truth, do not overwrite from panel
+                    panel_device_limit_raw = panel_user.get('hwidDeviceLimit')
+                    panel_device_limit = None
+                    try:
+                        if panel_device_limit_raw is not None:
+                            panel_device_limit = int(panel_device_limit_raw)
+                    except (TypeError, ValueError):
+                        panel_device_limit = None
+
+                    if panel_device_limit and panel_device_limit > 0:
+                        current_limit = subscription.device_limit or 1
+                        restored_limit = max(current_limit, panel_device_limit)
+                        if restored_limit != current_limit:
+                            subscription.device_limit = restored_limit
+                            logger.info(
+                                '✅ [multi-tariff] Восстановлен device_limit из панели',
+                                subscription_id=subscription.id,
+                                panel_uuid=panel_uuid,
+                                old_device_limit=current_limit,
+                                new_device_limit=restored_limit,
+                            )
 
                     # Update subscription URL
                     sub_url = panel_user.get('subscriptionUrl')
@@ -2174,7 +2229,28 @@ class RemnaWaveService:
                 subscription.traffic_used_gb = traffic_used_gb
                 logger.debug('Обновлен использованный трафик', traffic_used_gb=traffic_used_gb)
 
-            # traffic_limit_gb, device_limit: bot is source of truth, do not overwrite from panel
+            # traffic_limit_gb: bot is source of truth, do not overwrite from panel
+            # device_limit: при восстановлении после миграции panel может содержать
+            # фактический лимит (с докупленными слотами). Обновляем только вверх.
+            panel_device_limit_raw = panel_user.get('hwidDeviceLimit')
+            panel_device_limit = None
+            try:
+                if panel_device_limit_raw is not None:
+                    panel_device_limit = int(panel_device_limit_raw)
+            except (TypeError, ValueError):
+                panel_device_limit = None
+
+            if panel_device_limit and panel_device_limit > 0:
+                current_limit = subscription.device_limit or 1
+                restored_limit = max(current_limit, panel_device_limit)
+                if restored_limit != current_limit:
+                    subscription.device_limit = restored_limit
+                    logger.info(
+                        '✅ Sync: восстановлен device_limit из панели',
+                        value=getattr(user, 'telegram_id', '?'),
+                        old_device_limit=current_limit,
+                        new_device_limit=restored_limit,
+                    )
 
             # Update connected_squads from panel (panel is source of truth for squad assignments)
             active_squads = panel_user.get('activeInternalSquads', [])
