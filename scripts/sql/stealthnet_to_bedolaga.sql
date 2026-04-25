@@ -690,6 +690,25 @@ BEGIN
        AND cm_ref.target_user_id IS DISTINCT FROM u.id
        AND (u.referred_by_id IS NULL OR u.referred_by_id <> cm_ref.target_user_id);
 
+    -- Ensure balances are synchronized for both inserted and pre-existing users,
+    -- and resolve merged duplicates by taking the maximum source balance.
+    UPDATE users u
+       SET balance_kopeks = bal.max_balance_kopeks,
+           updated_at = GREATEST(
+               COALESCE(u.updated_at, '-infinity'::timestamptz),
+               now()
+           )
+      FROM (
+          SELECT
+              cm.target_user_id,
+              MAX(GREATEST(0, round(COALESCE(sc.balance, 0) * 100.0)::integer)) AS max_balance_kopeks
+          FROM migration_stealthnet.client_map cm
+          JOIN src_clients sc ON sc.id = cm.source_client_id
+          GROUP BY cm.target_user_id
+      ) bal
+     WHERE u.id = bal.target_user_id
+       AND u.balance_kopeks IS DISTINCT FROM bal.max_balance_kopeks;
+
     RAISE NOTICE 'clients migrated: inserted=%, updated=%, mapped=%', inserted_count, updated_count, mapped_count;
 END $$;
 
